@@ -146,7 +146,7 @@ if (Method == "hLICORN"){
   GRNnetwork <- rbind(GRNnetwork,GRNnetwork2)
 }
 
-if (Method="Lasso"){
+if (Method == "Lasso"){
   # connect TFs to their targets
   GRNnetwork <- Lasso.bigraph(numericalExpression = MA_normal,TFlist = TFs,
                               subsamples,weakness,maxScore,min.ratio,n.lambda,mc.cores)
