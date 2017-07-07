@@ -9,6 +9,8 @@ library(lsei)
 library(lars)
 library(matrixStats)
 library(scoop) # does not work yet
+               # should be installed by another way
+source("/Users/Magali/Desktop/recherche/LIONS/codejulien/scoop/R/scoop.R")
 
 # Define your path and target directory
 path <- "/Users/Magali/Desktop/recherche/LIONS/"
@@ -26,7 +28,13 @@ TFs <- TFs$V1
 # set parameters
 VarMax <- 0.1 # keep the top 10% variant genes (to make it going faster)
 
-# Run the main code
-Results <- LIONS_Main_Code(MA_cancer,MA_normal,TFs,
-                            VarMax,
-                            TargetDirectory,pathEM)
+# Run the main code (using the Lasso for reconstucting the network)
+Results <- LIONS_Main_Code(MA_cancer = MA_cancer,MA_normal = MA_normal,TFs = TFs,
+                            VarMax = VarMax,Method="Lasso",
+                           LassoThresholds=list(subsamples = 100),
+                            TargetDirectory = TargetDirectory,pathEM = pathEM)
+
+# Run the main code (using hLicorn for reconstucting the network)
+Results <- LIONS_Main_Code(MA_cancer = MA_cancer,MA_normal = MA_normal,TFs = TFs,
+                           VarMax = VarMax,Method="hLICORN",
+                           TargetDirectory = TargetDirectory,pathEM = pathEM)

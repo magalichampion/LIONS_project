@@ -4,7 +4,8 @@ LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
                             Method="hLICORN",
                             VarMax=1,
                             LicornThresholds=list(minGeneSupport=0.1,minCoregSupport=0.5,searchThresh=0.75),
-                            LassoThresholds=list(Subsamples=10000,weakness=0.6,maxScore=0.75,n.lambda=50,min.ratio=1e-4),
+                            LassoThresholds=list(subsamples=10000,weakness=0.5,maxScore=0.75,n.lambda=50,min.ratio=1e-4),
+                            TreeCoopLassoThresholds=list(subsamples=100,weakness=0.5,n.lambda=50,min.ratio=1e-4),
                             TargetDirectory,pathEM){
 ##### List of inputs ####
 # Data:
@@ -28,6 +29,7 @@ LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
 #   - maxScore: selection of edges with a probability larger than maxScore 
 #   - n.lambda: number of penalities
 #   - min.ratio: minimal penalty as a ratio of the largest
+#   - mc.cores: the number of cores
 #  
 # Others:
 #   - Target directory: where to store the outputs and data
@@ -50,8 +52,8 @@ if (Method=="hLICORN"){
     searchThresh <- LicornThresholds$searchThresh 
   }
 }
-  
-if (Method=="Lasso"){
+
+if (Method == "Lasso"){
   if (is.null(LassoThresholds$subsamples)){
     subsamples <- 10000
   } else {
@@ -76,6 +78,39 @@ if (Method=="Lasso"){
     min.ratio <- 1e-4
   } else {
     min.ratio <- LassoThresholds$min.ratio
+  }
+  if (is.null(LassoThresholds$mc.cores)){
+    mc.cores <- 1
+  } else {
+    mc.cores <- LassoThresholds$mc.cores
+  }
+}
+
+if (Method == "Tree-CoopLasso"){
+  if (is.null(TreeCoopLasso$subsamples)){
+    subsamples <- 100
+  } else {
+    subsamples <- TreeCoopLasso$subsamples
+  }
+  if (is.null(TreeCoopLasso$weakness)){
+    weakness <- 0.5
+  } else {
+    weakness <- TreeCoopLasso$weakness
+  }
+  if (is.null(TreeCoopLasso$n.lambda)){
+    n.lambda <- 50
+  } else {
+    n.lambda <- TreeCoopLasso$n.lambda
+  }
+  if (is.null(TreeCoopLasso$min.ratio)){
+    min.ratio <- 1e-4
+  } else {
+    min.ratio <- TreeCoopLasso$min.ratio
+  }
+  if (is.null(TreeCoopLasso$mc.cores)){
+    mc.cores <- 1
+  } else {
+    mc.cores <- TreeCoopLasso$mc.cores
   }
 }
   
@@ -161,6 +196,12 @@ if (Method == "Lasso"){
   # collapse networks
   GRNnetwork2[,1] <- str_replace_all(GRNnetwork2[,1],as.character(GRNnetwork2[,1]),paste0(GRNnetwork2[,1],"_TF"))
   GRNnetwork <- rbind(GRNnetwork,GRNnetwork2)
+}
+
+if (Method == "Scoop"){
+  # data
+
+  
 }
 
 # create the adjacency matrix
@@ -260,7 +301,7 @@ stab.lasso  <- function(X, Y, lambda, subsamples, weakness, mc.cores) {
   return(Reduce("+", mclapply(blocs, bloc.stability, mc.cores=mc.cores)))
 }
 
-Lasso.bigraph <- function(numericalExpression = MA_normal,TFlist = TFs,
+Lasso.bigraph <- function(numericalExpression,TFlist,
                           subsamples,weakness,maxScore,min.ratio,n.lambda,mc.cores){
   # define the matrices
   MA_TFs <- numericalExpression[,TFlist]
@@ -277,8 +318,10 @@ Lasso.bigraph <- function(numericalExpression = MA_normal,TFlist = TFs,
   # compute the stability path for each target gene
   if (ncol(MA_Targets)>1) pb <- txtProgressBar(min = 0, max = ncol(MA_Targets), style = 3)
   all.stab.path <- lapply(1:ncol(MA_Targets), function(i) {
-    if (ncol(MA_Targets)>1) setTxtProgressBar(pb,i)
-    stab.lasso(MA_TFs, MA_Targets[, i], lambda, subsamples, weakness, mc.cores=mc.cores)
+    if (ncol(MA_Targets)>1){
+      setTxtProgressBar(pb,i)
+    }
+    stab.lasso(X=MA_TFs, Y = MA_Targets[, i],lambda =  lambda,subsamples =  subsamples,weakness =  weakness, mc.cores=mc.cores)
   }
   )
 
@@ -339,4 +382,25 @@ Lasso.bigraph <- function(numericalExpression = MA_normal,TFlist = TFs,
   }
   GRNnetwork <- data.frame(GRNnetwork)
   return(GRNnetwork)
+}
+
+Scoop.lasso <- function(numericalExpression,TFlist){
+  ################### to be done
+  # load the data
+  MA_TFs <- numericalExpression[,TFlist]
+  if (length(intersect(colnames(numericalExpression),TFlist))==(ncol(numericalExpression)-1)){
+    MA_Targets <- as.matrix(numericalExpression[,-which(colnames(numericalExpression) %in% TFlist)],ncol=1,nrow=nrow(numericalExpression))
+    colnames(MA_Targets) <-  colnames(numericalExpression)[-which(colnames(numericalExpression)%in%TFlist)]
+    rownames(MA_Targets) <- rownames(numericalExpression)
+  } else {
+    MA_Targets <- numericalExpression[,-which(colnames(numericalExpression) %in% TFlist)]
+  }
+  
+  # get a comparable set of lambda
+  lmax <- max(apply(abs(crossprod(as.matrix(MA_TFs),as.matrix(MA_Targets))), 1, max))
+  lambda <- 10^seq(log10(lmax), log10(min.ratio * lmax), len = n.lambda)
+
+  # 1st step: build the hierarchy
+  distance <- as.dist(1-cor(MA_TFs)/2)
+  TFhierarchy <- hclust(distance,method = "average")
 }
