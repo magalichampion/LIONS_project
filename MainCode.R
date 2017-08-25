@@ -3,8 +3,8 @@
 LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
                             Method="hLICORN",
                             VarMax=1,
-                            LicornThresholds=list(minGeneSupport=0.1,minCoregSupport=0.5,searchThresh=0.75),
-                            LassoThresholds=list(subsamples=10000,weakness=0.5,maxScore=0.75,n.lambda=50,min.ratio=1e-4),
+                            LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.75),
+                            LassoThresholds=list(subsamples=ncol(MA_normal)/2,weakness=0.5,maxScore=0.75,n.lambda=50,min.ratio=1e-4),
                             TreeCoopLassoThresholds=list(subsamples=100,weakness=0.5,n.lambda=50,min.ratio=1e-4),
                             TargetDirectory,pathEM){
 ##### List of inputs ####
@@ -16,32 +16,29 @@ LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
 # Methods: to infer a GRN, you can use one of the following method
 #   - hLICORN: implemented in the R package Coregnet (by default)
 #   - Lasso + stability selection
-#   - Cooperative Lasso: implemented in the R package scoop
+#   - Cooperative Lasso: implemented in the R package scoop (not yet)
 #
 # Parameters:
-#   For hLICORN
 #   - VarMax: keep the top VarMax genes (by default = 1)
-#   - LicornThresholds: list of Licorn internal parameters searchThresh and minCoregSupport
+#
+#   For hLICORN: LicornThresholds (internal parameters of Licorn)
+#   - minCoregSupport: step 1 of Licorn, threshold for defining groups of co-regulated gene (by default = 0.5)
+#   - searchThresh: step 2 of Licorn, threshold for defining a signifcant regulation between co-regulators and their targets (by default = 0.75)
 #   
-#   For classical inference methods
-#   - Subsamples: number of subsamples for the sability selection step (should be large but may take some time to run)
-#   - weakness: ?
-#   - maxScore: selection of edges with a probability larger than maxScore 
-#   - n.lambda: number of penalities
-#   - min.ratio: minimal penalty as a ratio of the largest
-#   - mc.cores: the number of cores
+#   For Lasso: Lasso thresholds (optimized version by J. Chiquet)
+#   - Subsamples: number of subsamples for the sability selection step - should be large but may take some time to run (by default = n/2)
+#   - weakness: (by default = 0.5)
+#   - maxScore: selection of edges with a probability larger than maxScore (by default = 0.75)
+#   - n.lambda: number of penalities (by default = 50)
+#   - min.ratio: minimal penalty as a ratio of the largest (by default = 1e-4)
+#   - mc.cores: the number of cores (by default = 1)
 #  
 # Others:
 #   - Target directory: where to store the outputs and data
 #   - pathEM: where the EM algorithm is located
 
 if (Method=="hLICORN"){
-  if (is.null(LicornThresholds$minGeneSupport)){
-    minGeneSupport <- 0.1
-  } else {
-    minGeneSupport <- LicornThresholds$minGeneSupport 
-  }
-  if (is.null(LicornThresholds$minCoregSupport)){
+   if (is.null(LicornThresholds$minCoregSupport)){
     minCoregSupport <- 0.5
   } else {
     minCoregSupport <- LicornThresholds$minCoregSupport 
@@ -55,7 +52,7 @@ if (Method=="hLICORN"){
 
 if (Method == "Lasso"){
   if (is.null(LassoThresholds$subsamples)){
-    subsamples <- 10000
+    subsamples <- ncol(MA_normal)/2
   } else {
     subsamples <- LassoThresholds$subsamples
   }
@@ -65,7 +62,7 @@ if (Method == "Lasso"){
     weakness <- LassoThresholds$weakness
   }
   if (is.null(LassoThresholds$maxScore)){
-    maxScore <- 0.65
+    maxScore <- 0.75
   } else {
     maxScore <- LassoThresholds$maxScore
   }
@@ -156,8 +153,8 @@ cat(paste0("\n\t Inferring the gene regulatory network running ",Method," on nor
 
 if (Method == "hLICORN"){
   # connect TFs to their targets
-  dummyNet <- hLICORN(numericalExpression = t(MA_normal),TFlist = TFs,minGeneSupport,
-                      minCoregSupport,searchThresh) # this is a coregnet class object
+  dummyNet <- hLICORN(numericalExpression = t(MA_normal), TFlist = TFs,
+                      minCoregSupport = minCoregSupport, searchThresh = searchThresh) # this is a coregnet class object
   GRNnetwork <- Transform_Network(dummyNet)
 
   # connect TFs to other TFs
@@ -165,8 +162,8 @@ if (Method == "hLICORN"){
   for (i in (1:length(TFs))){
     # Check for an error (this means that there is no interaction)
     possibleError <- tryCatch({
-      dummyNet <- hLICORN(numericalExpression = t(MA_normal[,TFs]),TFlist = TFs[-i],minGeneSupport,
-                          minCoregSupport,searchThresh)
+      dummyNet <- hLICORN(numericalExpression = t(MA_normal[,TFs]),TFlist = TFs[-i],
+                          minCoregSupport = minCoregSupport, searchThresh = searchThresh)
       GRNnetwork2 <- rbind(GRNnetwork2,Transform_Network(dummyNet))
     }
     ,
@@ -200,7 +197,7 @@ if (Method == "Lasso"){
 
 if (Method == "Scoop"){
   # data
-
+  cat("Not available yet.")
   
 }
 
@@ -215,7 +212,8 @@ Adj_matrix <- Adj_matrix[!(rowSums(Adj_matrix) == 0), ]
 Adj_matrix <- Adj_matrix[,!(colSums(Adj_matrix) == 0)]
 Adj_matrix <- Adj_matrix[order(rownames(Adj_matrix)), ]
 cat("\n\t The inferred network is made of",nrow(GRN),"edges, which connect",length(unique(GRN[,2])),"TFs to",length(unique(GRN[,1])),"target genes.")  
- 
+cat("\n\t Each target gene is associated with an averaged number of",mean(rowSums(Adj_matrix)),"TF. Conversely, a TF is associated with an averaged number of",mean(colSums(Adj_matrix)),"target genes.")
+
 # update cancer data
 MA_cancer_TFs <- matrix(0,ncol=(nrow(Adj_matrix)+ncol(Adj_matrix)),nrow=nrow(MA_cancer))
 rownames(MA_cancer_TFs) = rownames(MA_cancer)
@@ -236,7 +234,7 @@ write.table(GRNnetwork,file=paste0(TargetDirectory,"Network.txt"),sep=" ; ",quot
 #############################################################################
 ### 3rd step: computing a deregulation score for all genes in each sample ###
 #############################################################################
-cat("\n\t Computing a deregulation score for all genes in each sample trhough an EM algorithm.")
+cat("\n\t Computing a deregulation score for all genes in each sample through an EM algorithm.")
 system(paste0("java -jar ",pathEM,"ddt.jar -network ",TargetDirectory,"Network.txt -expression ",TargetDirectory,"Expression.txt -scores ",TargetDirectory,"Scores.txt"))
 Score <- read.table(paste0(TargetDirectory,"Scores.txt"),sep=',')
 colnames(Score) <- substring(colnames(Score),2)
@@ -257,12 +255,15 @@ OptimizationLoop <- function(i){
 Beta <- matrix(unlist(mclapply(X=1:ncol(Scores_log), FUN=OptimizationLoop)), ncol = ncol(Scores_log), byrow = FALSE)
 rownames(Beta) <- colnames(Adj_matrix)
 colnames(Beta) <- colnames(Scores_log)
+Beta[which(Beta<10e-3)] <- rep(0,length(which(Beta<10e-3)))
 
 # save final results
 Results <- list(Beta=Beta,Score=Score,Adj_matrix=Adj_matrix)
 return(Results)
 }
 
+# this code transforms a coregnet object into a matrix that can be used as an input of the EM algorithm 
+# (matrix with three columns: gene, activator, inhibitor)
 Transform_Network <- function(dummyNet){
   if (length(dummyNet@adjacencyList$bygene)>1){
     Network <- foreach(j=1:length(dummyNet@adjacencyList$bygene),.combine='rbind') %do% {
@@ -312,6 +313,8 @@ Lasso.bigraph <- function(numericalExpression,TFlist,
   } else {
     MA_Targets <- numericalExpression[,-which(colnames(numericalExpression) %in% TFlist)]
   }
+  
+  # set the grid of lambda
   lmax <- max(apply(abs(crossprod(as.matrix(MA_TFs),as.matrix(MA_Targets))), 1, max))
   lambda <- 10^seq(log10(lmax), log10(min.ratio * lmax), len = n.lambda)
 
