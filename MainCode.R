@@ -255,10 +255,10 @@ OptimizationLoop <- function(i){
 Beta <- matrix(unlist(mclapply(X=1:ncol(Scores_log), FUN=OptimizationLoop)), ncol = ncol(Scores_log), byrow = FALSE)
 rownames(Beta) <- colnames(Adj_matrix)
 colnames(Beta) <- colnames(Scores_log)
-Beta[which(Beta<10e-3)] <- rep(0,length(which(Beta<10e-3)))
+#Beta[which(Beta<10e-3)] <- rep(0,length(which(Beta<10e-3)))
 
 # save final results
-Results <- list(Beta=Beta,Score=Score,Adj_matrix=Adj_matrix)
+Results <- list(Beta=Beta,Score=Scores_log,Adj_matrix=Adj_matrix)
 return(Results)
 }
 
