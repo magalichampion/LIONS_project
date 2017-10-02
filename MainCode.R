@@ -249,7 +249,7 @@ Scores_log <- scale(log10(as.matrix(Score)))
 
 OptimizationLoop <- function(i){
   lsei(a=Adj_matrix,b=Scores_log[,i],
-       c=rep(1,ncol(Adj_matrix)),d=1,
+#       c=rep(1,ncol(Adj_matrix)),d=1,
        e=diag(ncol(Adj_matrix)),f=rep(0,ncol(Adj_matrix)))
 }
 Beta <- matrix(unlist(mclapply(X=1:ncol(Scores_log), FUN=OptimizationLoop)), ncol = ncol(Scores_log), byrow = FALSE)

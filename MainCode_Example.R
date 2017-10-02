@@ -8,6 +8,9 @@ library(igraph)
 library(lsei)
 library(lars)
 library(matrixStats)
+library(RCurl)
+library(limma)
+library(impute)
 # library(scoop) # does not work yet
                # should be installed by another way
 # source("/Users/Magali/Desktop/recherche/LIONS/codejulien/scoop/R/scoop.R")
@@ -17,16 +20,22 @@ path <- "/Users/Magali/Desktop/recherche/LIONS/"
 pathEM <- paste0(path,"algoEM/")
 TargetDirectory <- paste0(path,"results/")
 source(paste0(path,"LIONS_project/MainCode.R"))
+source(paste0(path,"LIONS_project/TCGA_data.R"))
 
 # load the data
 # first type of data (CIT)
 MA_normal <- read.table(paste0(path,"Data/expression/NormalExpressionData_AllGenes.txt"))
 MA_cancer <- read.table(paste0(path,"Data/expression/TumorExpressionData_AllGenes.txt"))
 rownames(MA_cancer) <- str_replace_all(rownames(MA_cancer),"[A-Z]","") # anonymous data
-TFs <- read.table(paste0(path,"Data/expression/AllHumanTranscriptionFactor.txt"))
-TFs <- TFs$V1 
 
 # second type of data (TCGA)
+DataDirectory <- paste0(path,"Data/TCGA")
+load(paste0(path,"Data/TCGA/BatchData.rda"))
+Data <- Download_CancerSite(CancerSite = "BLCA", TargetDirectory = DataDirectory,downloadData = FALSE)
+
+# list of transcription factors
+TFs <- read.table(paste0(path,"Data/expression/AllHumanTranscriptionFactor.txt"))
+TFs <- TFs$V1 
 
 # set parameters
 VarMax <- 0.75 # keep the top VarMax% variant genes (to make it going faster)
