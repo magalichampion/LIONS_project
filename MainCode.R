@@ -1,6 +1,7 @@
 ############## here is the main code for LIONS ##############
 
 LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
+                            CNV_matrix, CNV_correction = FALSE,
                             Method="hLICORN",
                             VarMax=1,
                             LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.75),
@@ -12,7 +13,10 @@ LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
 #   - MA_cancer: matrix of gene expression from tumor samples (genes in columns, samples in rows)
 #   - MA_normal: matrix of gene expression from normal tissues (genes in columns, samples in rows)
 #   - TFs: list of transcription factors
+#   - CNV_matrix: matrix containing CNV data (genes in coumns, samples in rows)
 #
+# CNV_correction: TRUE/FALSE depending on whether you want to correct gene expression data from copy number effects (if TRUE, the program needs CNV data)
+#  
 # Methods: to infer a GRN, you can use one of the following method
 #   - hLICORN: implemented in the R package Coregnet (by default)
 #   - Lasso + stability selection
@@ -114,6 +118,7 @@ if (Method == "Tree-CoopLasso"){
 #######################################
 ##### 1st step: Cleaning the data #####
 #######################################
+  
 Genes <- intersect(colnames(MA_cancer),colnames(MA_normal))
 if (length(Genes)==0){
   stop("\n\t There is no genes in commun between MA_cancer and MA_normal. Please check your data.")
@@ -141,6 +146,13 @@ if (length(TFs)==0){
 MA_cancer <- MA_cancer[,Genes]
 MA_normal <- MA_normal[,Genes]
 cat("\n\t Summary:",length(Genes),"genes with expression data from",nrow(MA_cancer),"tumor samples and",nrow(MA_normal),"normal tissues.")
+
+#if (CNV_correction == TRUE){
+#  MA_normal <- DataCorrection(MA_matrix = MA_matrix_reduced,CNV_matrix = CNV_matrix)
+#} else {
+#  MA_matrix_corrected = MA_matrix_reduced
+#}
+#ProcessedData <- list(MA_matrix= MA_matrix,MA_matrix_corrected=MA_matrix_corrected,CNV_matrix=CNV_matrix,TFs=TFs)
 
 # standardize data
 MA_normal = MA_normal - matrix(1,nrow(MA_normal),1) %*% colMeans(MA_normal)
@@ -237,7 +249,7 @@ write.table(GRNnetwork,file=paste0(TargetDirectory,"Network.txt"),sep=" ; ",quot
 cat("\n\t Computing a deregulation score for all genes in each sample through an EM algorithm.")
 system(paste0("java -jar ",pathEM,"ddt.jar -network ",TargetDirectory,"Network.txt -expression ",TargetDirectory,"Expression.txt -scores ",TargetDirectory,"Scores.txt"))
 Score <- read.table(paste0(TargetDirectory,"Scores.txt"),sep=',')
-colnames(Score) <- substring(colnames(Score),2)
+colnames(Score) <- rownames(MA_cancer_TFs)
 
 #############################################
 ### 4th step: Finding the deregulated TFs ###
@@ -255,7 +267,7 @@ OptimizationLoop <- function(i){
 Beta <- matrix(unlist(mclapply(X=1:ncol(Scores_log), FUN=OptimizationLoop)), ncol = ncol(Scores_log), byrow = FALSE)
 rownames(Beta) <- colnames(Adj_matrix)
 colnames(Beta) <- colnames(Scores_log)
-#Beta[which(Beta<10e-3)] <- rep(0,length(which(Beta<10e-3)))
+Beta[which(Beta<0)] <- rep(0,length(which(Beta<0)))
 
 # save final results
 Results <- list(Beta=Beta,Score=Scores_log,Adj_matrix=Adj_matrix)
@@ -406,4 +418,27 @@ Scoop.lasso <- function(numericalExpression,TFlist){
   # 1st step: build the hierarchy
   distance <- as.dist(1-cor(MA_TFs)/2)
   TFhierarchy <- hclust(distance,method = "average")
+}
+
+## this function is useful to correct gene expression for CNV
+DataCorrection <- function(MA_matrix,CNV_matrix){
+  # 1st: we need to overlap the datasets
+  OverlapSamples <- intersect(rownames(MA_matrix),rownames(CNV_matrix))
+  OverlapGenes <- intersect(colnames(MA_matrix),colnames(CNV_matrix))
+  cat(paste0("We have ",length(OverlapGenes)," genes and ",length(OverlapSamples)," samples with both MA and CNV data.\n"))
+  
+  CNV_matrix <- CNV_matrix[OverlapSamples,OverlapGenes]
+  MA_matrix_reduced <- MA_matrix[OverlapSamples,OverlapGenes]
+  
+  # 2nd: correction using CNV
+  cat("Correcting gene expression using CNV.\n")
+  CorrectedExpression <- foreach(j=1:ncol(CNV_matrix),.combine='cbind') %do% {
+    Predictions <-resid(lm(MA_matrix_reduced[,j]~as.numeric(CNV_matrix[,j]),na.action=na.exclude))
+  }
+  rownames(CorrectedExpression) <- rownames(MA_matrix_reduced)
+  CorrectedExpression[is.na(CorrectedExpression)] <- MA_matrix_reduced[is.na(CorrectedExpression)]
+  MA_matrix_corrected = MA_matrix
+  MA_matrix_corrected[OverlapSamples,OverlapGenes] <- CorrectedExpression
+  MA_matrix_corrected <- scale(MA_matrix_corrected)
+  return(MA_matrix_corrected)
 }

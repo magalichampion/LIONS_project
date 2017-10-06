@@ -31,14 +31,16 @@ rownames(MA_cancer) <- str_replace_all(rownames(MA_cancer),"[A-Z]","") # anonymo
 # second type of data (TCGA)
 DataDirectory <- paste0(path,"Data/TCGA")
 load(paste0(path,"Data/TCGA/BatchData.rda"))
-Data <- Download_CancerSite(CancerSite = "BLCA", TargetDirectory = DataDirectory,downloadData = FALSE)
+DataSetDirectories <- Download_CancerSite(CancerSite = "BLCA", TargetDirectory = DataDirectory,downloadData = FALSE)
+ProcessedData <- Preprocess_CancerSite(CancerSite = "BLCA",DataSetDirectories = DataSetDirectories)
+load(paste0(DataDirectory,"/ProcessedData_BLCA.Rdata"))
 
 # list of transcription factors
 TFs <- read.table(paste0(path,"Data/expression/AllHumanTranscriptionFactor.txt"))
 TFs <- TFs$V1 
 
 # set parameters
-VarMax <- 0.75 # keep the top VarMax% variant genes (to make it going faster)
+VarMax <- 0.75 # filter for genes, keep only the top VarMax % variant genes
 
 # Run the main code (using the Lasso for reconstucting the network)
 Results <- LIONS_Main_Code(MA_cancer = MA_cancer,MA_normal = MA_normal,TFs = TFs,
@@ -47,6 +49,6 @@ Results <- LIONS_Main_Code(MA_cancer = MA_cancer,MA_normal = MA_normal,TFs = TFs
                             TargetDirectory = TargetDirectory,pathEM = pathEM)
 
 # Run the main code (using hLicorn for reconstucting the network)
-Results <- LIONS_Main_Code(MA_cancer = MA_cancer, MA_normal = MA_normal, TFs = TFs,
+Results <- LIONS_Main_Code(MA_cancer = t(ProcessedData$MA_TCGA), MA_normal = t(ProcessedData$MA_TCGA), TFs = TFs,
                            VarMax = VarMax, Method="hLICORN",
                            TargetDirectory = TargetDirectory, pathEM = pathEM)
