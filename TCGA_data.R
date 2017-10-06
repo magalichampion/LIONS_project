@@ -334,7 +334,7 @@ Preprocess_CancerSite <- function(CancerSite,DataSetDirectories) {
   }        
   if (length(CNVgenes)>1){
     cat("\tBatch correction.\n")
-    CNV_TCGA=TCGA_BatchCorrection_MolecularData(CGH_Data$CGH_Data_Segmented,BatchData,MinPerBatch=5)    
+    CNV_TCGA=TCGA_BatchCorrection_MolecularData(CGH_Data$CGH_Data_Segmented,BatchData,5)    
     Genes=rownames(CNV_TCGA)
   } else {
     cat("\tBatch correction can't be done with less than two CNV alterated genes.\n")
@@ -345,49 +345,8 @@ Preprocess_CancerSite <- function(CancerSite,DataSetDirectories) {
   SplitGenes=strsplit2(Genes,'\\|')
   rownames(CNV_TCGA)=SplitGenes[,1]      
   CNV_TCGA=TCGA_GENERIC_MergeData(unique(rownames(CNV_TCGA)),CNV_TCGA)        
-  
-  # Overlapping all data sets (for MET and CNV, making sure all genes and samples exist in the MA data)
-  cat('Summarizing:\n')
-  cat('\tFound',length(rownames(MA_TCGA)),'genes and',length(colnames(MA_TCGA)),'samples for MA data.\n')    
-  cat('\tFound',length(rownames(CNV_TCGA)),'genes and',length(colnames(CNV_TCGA)),'samples for GISTIC data before overlapping.\n')    
-  cat('\tFound',length(rownames(MET_TCGA)),'genes and',length(colnames(MET_TCGA)),'samples for MethylMix data before overlapping.\n')    
-  
-  cat('Overlapping genes and samples for GISTIC and MethylMix.\n')
-  OverlapGenes=Reduce(intersect,list(rownames(MA_TCGA),rownames(CNV_TCGA)))
-  OverlapSamples=Reduce(intersect,list(colnames(MA_TCGA),colnames(CNV_TCGA)))
-  if (length(OverlapGenes)==1 || length(OverlapSamples)==1){
-    CNV_TCGA_temp <- matrix(0,length(OverlapGenes),length(OverlapSamples))
-    rownames(CNV_TCGA_temp) <- OverlapGenes
-    colnames(CNV_TCGA_temp) <- OverlapSamples
-    if (length(OverlapGenes)==1){
-      CNV_TCGA_temp[1,] <- CNV_TCGA[,OverlapSamples]
-    } else {
-      CNV_TCGA_temp[,1] <- CNV_TCGA[OverlapGenes,]
-    }
-    CNV_TCGA = CNV_TCGA_temp
-  } else {
-    CNV_TCGA=CNV_TCGA[OverlapGenes,OverlapSamples]
-  }
-  cat('\tFound',length(OverlapGenes),'overlapping genes and',length(OverlapSamples),'samples for GISTIC data.\n')    
-  
-  OverlapGenes=Reduce(intersect,list(rownames(MA_TCGA),rownames(MET_TCGA)))
-  OverlapSamples=Reduce(intersect,list(colnames(MA_TCGA),colnames(MET_TCGA)))
-  if (length(OverlapGenes)==1 || length(OverlapSamples)==1){
-    MET_TCGA_temp <- matrix(0,length(OverlapGenes),length(OverlapSamples))
-    rownames(MET_TCGA_temp) <- OverlapGenes
-    colnames(MET_TCGA_temp) <- OverlapSamples
-    if (length(OverlapGenes)==1){
-      MET_TCGA_temp[1,] <- MET_TCGA[,OverlapSamples]
-    } else {
-      MET_TCGA_temp[,1] <- MET_TCGA[OverlapGenes,]
-    }
-    MET_TCGA = MET_TCGA_temp
-  } else {
-    MET_TCGA=MET_TCGA[OverlapGenes,OverlapSamples]
-  }
-  cat('\tFound',length(OverlapGenes),'overlapping genes and',length(OverlapSamples),'samples for MethylMix data.\n')
-  
-  return(list(MA_TCGA=MA_TCGA,CNV_TCGA=CNV_TCGA,MET_TCGA=MET_TCGA))
+
+  return(list(MA_TCGA=MA_TCGA,CNV_TCGA=CNV_TCGA))
 }
 
 TCGA_Load_GISTICdata <- function (GisticDirectory) {
