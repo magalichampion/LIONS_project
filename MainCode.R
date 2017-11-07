@@ -4,7 +4,7 @@ LIONS_Main_Code <- function(MA_cancer,MA_normal,TFs,
                             CNV_matrix, CNV_correction = FALSE,
                             Method="hLICORN",
                             VarMax=1,
-                            LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.75),
+                            LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.5),
                             LassoThresholds=list(subsamples=ncol(MA_normal)/2,weakness=0.5,maxScore=0.75,n.lambda=50,min.ratio=1e-4),
                             TreeCoopLassoThresholds=list(subsamples=100,weakness=0.5,n.lambda=50,min.ratio=1e-4),
                             TargetDirectory,pathEM){
@@ -235,6 +235,11 @@ InterTFs <- colnames(MA_cancer_TFs)[grep("_TF",colnames(MA_cancer_TFs))]
 MA_cancer_TFs[,InterTargets] <- as.matrix(MA_cancer[,InterTargets],nrow(MA_cancer),length(InterTargets)) 
 MA_cancer_TFs[,InterTFs] <- as.matrix(MA_cancer[,str_replace_all(InterTFs,"_TF","")],nrow(MA_cancer),length(InterTFs))
 
+if (CNV_correction == TRUE){
+  MA_cancer_TFs <- DataCorrection(MA_matrix = MA_cancer_TFs,CNV_matrix = CNV_matrix)
+}
+ProcessedData <- list(MA_matrix= MA_matrix,MA_matrix_corrected=MA_matrix_corrected,CNV_matrix=CNV_matrix,TFs=TFs)
+
 # standardize data
 MA_cancer_TFs = MA_cancer_TFs - matrix(1,nrow(MA_cancer_TFs),1) %*% colMeans(MA_cancer_TFs)
 MA_cancer_TFs = MA_cancer_TFs / sqrt( (1/nrow(MA_cancer_TFs)) * matrix(1,nrow(MA_cancer_TFs),1) %*% colSums(MA_cancer_TFs^2))
@@ -255,14 +260,20 @@ colnames(Score) <- rownames(MA_cancer_TFs)
 ### 4th step: Finding the deregulated TFs ###
 #############################################
 cat("\n\t Identifying the deregulated TFs through a penalized linear model.")
+
 Score <- Score[!(rowSums(Score) == 0), ]
 Score <- Score[order(rownames(Score)), ]
-Scores_log <- scale(log10(as.matrix(Score)))
+Scores_log <- as.matrix(Score)
+#Scores_log <- scale(log10(as.matrix(Score)))
 
 OptimizationLoop <- function(i){
-  lsei(a=Adj_matrix,b=Scores_log[,i],
+  a = Adj_matrix
+  b <- Scores_log[,i]
+  e <- rbind(diag(ncol(Adj_matrix)),-diag(ncol(Adj_matrix)))
+  f <- c(rep(0,ncol(Adj_matrix)),rep(-1,ncol(Adj_matrix)))
+  lsei(a=a,b=b,
 #       c=rep(1,ncol(Adj_matrix)),d=1,
-       e=diag(ncol(Adj_matrix)),f=rep(0,ncol(Adj_matrix)))
+       e=e,f=f)
 }
 Beta <- matrix(unlist(mclapply(X=1:ncol(Scores_log), FUN=OptimizationLoop)), ncol = ncol(Scores_log), byrow = FALSE)
 rownames(Beta) <- colnames(Adj_matrix)
@@ -421,14 +432,14 @@ Scoop.lasso <- function(numericalExpression,TFlist){
 }
 
 ## this function is useful to correct gene expression for CNV
-DataCorrection <- function(MA_matrix,CNV_matrix){
+DataCorrection <- function(MA,CNV_matrix){
   # 1st: we need to overlap the datasets
-  OverlapSamples <- intersect(rownames(MA_matrix),rownames(CNV_matrix))
-  OverlapGenes <- intersect(colnames(MA_matrix),colnames(CNV_matrix))
+  OverlapSamples <- intersect(rownames(MA),rownames(CNV_matrix))
+  OverlapGenes <- intersect(colnames(MA),colnames(CNV_matrix))
   cat(paste0("We have ",length(OverlapGenes)," genes and ",length(OverlapSamples)," samples with both MA and CNV data.\n"))
   
   CNV_matrix <- CNV_matrix[OverlapSamples,OverlapGenes]
-  MA_matrix_reduced <- MA_matrix[OverlapSamples,OverlapGenes]
+  MA_matrix_reduced <- MA[OverlapSamples,OverlapGenes]
   
   # 2nd: correction using CNV
   cat("Correcting gene expression using CNV.\n")
@@ -437,7 +448,7 @@ DataCorrection <- function(MA_matrix,CNV_matrix){
   }
   rownames(CorrectedExpression) <- rownames(MA_matrix_reduced)
   CorrectedExpression[is.na(CorrectedExpression)] <- MA_matrix_reduced[is.na(CorrectedExpression)]
-  MA_matrix_corrected = MA_matrix
+  MA_matrix_corrected = MA
   MA_matrix_corrected[OverlapSamples,OverlapGenes] <- CorrectedExpression
   MA_matrix_corrected <- scale(MA_matrix_corrected)
   return(MA_matrix_corrected)
