@@ -34,6 +34,8 @@ load(paste0(path,"Data/TCGA/BatchData.rda"))
 DataSetDirectories <- Download_CancerSite(CancerSite = "BLCA", TargetDirectory = DataDirectory,downloadData = FALSE)
 ProcessedData <- Preprocess_CancerSite(CancerSite = "BLCA",DataSetDirectories = DataSetDirectories)
 load(paste0(DataDirectory,"/ProcessedData_BLCA.Rdata"))
+MA_cancer = MA_normal <- t(ProcessedData$MA_TCGA)
+CNV_matrix <- t(ProcessedData$CNV_TCGA)
 
 # list of transcription factors
 TFs <- read.table(paste0(path,"Data/expression/AllHumanTranscriptionFactor.txt"))
@@ -50,5 +52,6 @@ Results <- LIONS_Main_Code(MA_cancer = MA_cancer,MA_normal = MA_normal,TFs = TFs
 
 # Run the main code (using hLicorn for reconstucting the network)
 Results <- LIONS_Main_Code(MA_cancer = t(ProcessedData$MA_TCGA), MA_normal = t(ProcessedData$MA_TCGA), TFs = TFs,
-                           VarMax = VarMax, Method="hLICORN",
+                           VarMax = VarMax, Method="hLICORN",CNV_matrix = CNV_matrix,CNV_correction = TRUE,
+                           LicornThresholds=list(minCoregSupport=0.25,searchThresh=0.25),
                            TargetDirectory = TargetDirectory, pathEM = pathEM)

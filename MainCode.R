@@ -126,6 +126,16 @@ if (length(Genes)==0){
 if (length(intersect(Genes,TFs))==0){
   stop("\n\t There is no TFs in the gene expression data matrix. Please check your data.")
 }
+MA_cancer <- MA_cancer[,Genes]
+MA_normal <- MA_normal[,Genes]
+
+if (CNV_correction==TRUE){
+  Genes <- intersect(colnames(CNV_matrix),Genes)
+  cat(paste0("There is ",length(Genes)," genes with both gene expression and CNV data."))
+  MA_cancer <- MA_cancer[,Genes]
+  MA_normal <- MA_normal[,Genes]
+  CNV_matrix <- CNV_matrix[,Genes]
+}
 
 cat("\n\t Restricting the number of genes to the",VarMax*100,"% with highest variance.")
 # from the normal data
@@ -140,6 +150,7 @@ if (length(Genes)==0){
   stop("\n\t There is no genes in commun between MA_cancer and MA_normal. Please re-run the algorithm with a less contrained VarMax parameter.")
 }
 TFs <- intersect(Genes,TFs)
+Targets <- Genes[is.na(match(Genes,TFs))]
 if (length(TFs)==0){
   stop("\n\t There is no TFs with high variance. Please re-run the algorithm with a less constrained VarMax parameter.")
 }
@@ -147,11 +158,13 @@ MA_cancer <- MA_cancer[,Genes]
 MA_normal <- MA_normal[,Genes]
 cat("\n\t Summary:",length(Genes),"genes with expression data from",nrow(MA_cancer),"tumor samples and",nrow(MA_normal),"normal tissues.")
 
-#if (CNV_correction == TRUE){
-#  MA_normal <- DataCorrection(MA_matrix = MA_matrix_reduced,CNV_matrix = CNV_matrix)
-#} else {
-#  MA_matrix_corrected = MA_matrix_reduced
-#}
+if (CNV_correction == TRUE){ # correction for the target genes only
+  MA_normal_corrected <- DataCorrection(MA = MA_normal[,Targets],CNV_matrix = CNV_matrix)
+  MA_normal[,Targets] <- MA_normal_corrected
+  
+  MA_cancer_corrected <- DataCorrection(MA = MA_cancer[,Targets],CNV_matrix = CNV_matrix)
+  MA_cancer[,Targets] <- MA_cancer_corrected
+}
 #ProcessedData <- list(MA_matrix= MA_matrix,MA_matrix_corrected=MA_matrix_corrected,CNV_matrix=CNV_matrix,TFs=TFs)
 
 # standardize data
@@ -450,6 +463,6 @@ DataCorrection <- function(MA,CNV_matrix){
   CorrectedExpression[is.na(CorrectedExpression)] <- MA_matrix_reduced[is.na(CorrectedExpression)]
   MA_matrix_corrected = MA
   MA_matrix_corrected[OverlapSamples,OverlapGenes] <- CorrectedExpression
-  MA_matrix_corrected <- scale(MA_matrix_corrected)
+  #MA_matrix_corrected <- scale(MA_matrix_corrected)
   return(MA_matrix_corrected)
 }
