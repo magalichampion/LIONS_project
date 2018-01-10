@@ -317,15 +317,15 @@ Preprocess_CancerSite <- function(CancerSite,DataSetDirectories) {
   CNVgenes=gsub('\\]','',CNVgenes)
   
   # selecting the segmented GISTIC data
-  if (length(CNVgenes)>1){
-    CGH_Data$CGH_Data_Segmented=CGH_Data$CGH_Data_Segmented[unique(CNVgenes),]   
-  } else {
-    CGH_Data_Segmented_temp = matrix(0,1,ncol(CGH_Data$CGH_Data_Segmented))
-    colnames(CGH_Data_Segmented_temp) = colnames(CGH_Data$CGH_Data_Segmented)
-    rownames(CGH_Data_Segmented_temp) = CNVgenes
-    CGH_Data_Segmented_temp[1,] <- CGH_Data$CGH_Data_Segmented[unique(CNVgenes),]  
-    CGH_Data$CGH_Data_Segmented = CGH_Data_Segmented_temp
-  }
+  #if (length(CNVgenes)>1){
+  #  CGH_Data$CGH_Data_Segmented=CGH_Data$CGH_Data_Segmented[unique(CNVgenes),]   
+  #} else {
+  #  CGH_Data_Segmented_temp = matrix(0,1,ncol(CGH_Data$CGH_Data_Segmented))
+  #  colnames(CGH_Data_Segmented_temp) = colnames(CGH_Data$CGH_Data_Segmented)
+  #  rownames(CGH_Data_Segmented_temp) = CNVgenes
+  #  CGH_Data_Segmented_temp[1,] <- CGH_Data$CGH_Data_Segmented[unique(CNVgenes),]  
+  #  CGH_Data$CGH_Data_Segmented = CGH_Data_Segmented_temp
+  #}
   SampleNames=colnames(CGH_Data$CGH_Data_Segmented)
   if (CancerSite =='LAML') {
     colnames(CGH_Data$CGH_Data_Segmented)=paste(SampleNames,'-03',sep='')
