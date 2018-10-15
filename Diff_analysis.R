@@ -1,4 +1,4 @@
-# code for differential analysis
+# code for differential analysis (test)
 path <- "/Users/Magali/Desktop/recherche/LIONS/"
 pathEM <- paste0(path,"algoEM/")
 TargetDirectory <- paste0(path,"results/")
