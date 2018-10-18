@@ -276,22 +276,28 @@ cat("\n\t Identifying the deregulated TFs through a penalized linear model.")
 
 Score <- Score[!(rowSums(Score) == 0), ]
 Score <- Score[order(rownames(Score)), ]
-Scores_log <- as.matrix(Score)
+Scores_log <- scale(log10(as.matrix(Score)))
 #Scores_log <- scale(log10(as.matrix(Score)))
 
 OptimizationLoop <- function(i){
-  a = Adj_matrix
-  b <- Scores_log[,i]
-  e <- rbind(diag(ncol(Adj_matrix)),-diag(ncol(Adj_matrix)))
-  f <- c(rep(0,ncol(Adj_matrix)),rep(-1,ncol(Adj_matrix)))
-  lsei(a=a,b=b,
-#       c=rep(1,ncol(Adj_matrix)),d=1,
-       e=e,f=f)
+#  a = Adj_matrix
+#  b <- Scores_log[,i]
+#  e <- rbind(diag(ncol(Adj_matrix)),-diag(ncol(Adj_matrix)))
+#  f <- c(rep(0,ncol(Adj_matrix)),rep(-1,ncol(Adj_matrix)))
+#  lsei(a=a,b=b,
+##       c=rep(1,ncol(Adj_matrix)),d=1,
+#       e=e,f=f)
+  #pe.factor <- 1/rowSums(Adj_matrix>0) # test de modèle penalisé
+  fit <- glmnet(scale(Adj_matrix),Scores_log[,i],lambda=0,upper.limits=1,lower.limits=0)
+  #fitcv <- cv.glmnet(Adj_matrix,Scores_log[,i],upper.limits=1,lower.limits=0,penalty.factor = pe.factor)
+  #fit <- glmnet(Adj_matrix,Scores_log[,i],lambda=fitcv$lambda.min,upper.limits=1,lower.limits=0,penalty.factor = pe.factor)
+  beta <- as.vector(fit$beta)
+  names(beta) <- colnames(Adj_matrix)
+  beta
 }
 Beta <- matrix(unlist(mclapply(X=1:ncol(Scores_log), FUN=OptimizationLoop)), ncol = ncol(Scores_log), byrow = FALSE)
 rownames(Beta) <- colnames(Adj_matrix)
 colnames(Beta) <- colnames(Scores_log)
-Beta[which(Beta<0)] <- rep(0,length(which(Beta<0)))
 
 # save final results
 Results <- list(Beta=Beta,Score=Scores_log,Adj_matrix=Adj_matrix)

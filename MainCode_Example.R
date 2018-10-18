@@ -16,11 +16,11 @@ library(impute)
 # source("/Users/Magali/Desktop/recherche/LIONS/codejulien/scoop/R/scoop.R")
 
 # Define your path and target directory
-path <- "/Users/Magali/Desktop/recherche/LIONS/"
+path <- "/Users/mchampion/Desktop/LIONS/"
 pathEM <- paste0(path,"algoEM/")
 TargetDirectory <- paste0(path,"results/")
-source(paste0(path,"LIONS_project/MainCode.R"))
-source(paste0(path,"LIONS_project/TCGA_data.R"))
+source(paste0(path,"LIONS/MainCode.R"))
+source(paste0(path,"LIONS/TCGA_data.R"))
 
 # load the data
 # first type of data (CIT)
@@ -34,24 +34,29 @@ load(paste0(path,"Data/TCGA/BatchData.rda"))
 DataSetDirectories <- Download_CancerSite(CancerSite = "BLCA", TargetDirectory = DataDirectory,downloadData = FALSE)
 ProcessedData <- Preprocess_CancerSite(CancerSite = "BLCA",DataSetDirectories = DataSetDirectories)
 load(paste0(DataDirectory,"/ProcessedData_BLCA.Rdata"))
-MA_cancer = MA_normal <- t(ProcessedData$MA_TCGA)
-CNV_matrix <- t(ProcessedData$CNV_TCGA)
+MA <- t(ProcessedData$MA_TCGA)
+
+# load the different subtypes
+Subtypes <- read.table(paste0(path,"Data/Subtypes/Classif_TCGA_mars_2018.csv"),sep=",",header=TRUE)
+samples <- as.character(Subtypes$ID)
+samples <- substr(samples,1,nchar(samples)-1)
+Subtypes <- Subtypes[,4]
+Subtypes <- as.character(Subtypes)
+names(Subtypes) <- samples
+Subtypes <- Subtypes[rownames(MA)]
 
 # list of transcription factors
-TFs <- read.table(paste0(path,"Data/expression/AllHumanTranscriptionFactor.txt"))
+TFs <- read.table(paste0(path,"Data/TCGA/AllHumanTranscriptionFactor.txt"))
 TFs <- TFs$V1 
 
 # set parameters
 VarMax <- 0.75 # filter for genes, keep only the top VarMax % variant genes
 
-# Run the main code (using the Lasso for reconstucting the network)
-Results <- LIONS_Main_Code(MA_cancer = MA_cancer,MA_normal = MA_normal,TFs = TFs,
-                            VarMax = VarMax,Method="Lasso",
-                           LassoThresholds=list(subsamples = 100),
-                            TargetDirectory = TargetDirectory,pathEM = pathEM)
-
 # Run the main code (using hLicorn for reconstucting the network)
-Results <- LIONS_Main_Code(MA_cancer = t(ProcessedData$MA_TCGA), MA_normal = t(ProcessedData$MA_TCGA), TFs = TFs,
-                           VarMax = VarMax, Method="hLICORN",CNV_matrix = CNV_matrix,CNV_correction = TRUE,
-                           LicornThresholds=list(minCoregSupport=0.25,searchThresh=0.25),
+subtypes <- names(which(Subtypes==names(table(Subtypes))[1]))
+Results <- LIONS_Main_Code(MA_cancer = MA[subtypes,],
+                           MA_normal = MA[!(rownames(MA)%in%subtypes),],
+                           TFs = TFs,Method="hLICORN",
+                           CNV_matrix = CNV_matrix,CNV_correction = TRUE,
+                           LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.5),
                            TargetDirectory = TargetDirectory, pathEM = pathEM)
