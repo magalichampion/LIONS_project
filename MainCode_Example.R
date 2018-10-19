@@ -49,6 +49,7 @@ Subtypes <- Subtypes[rownames(MA)]
 load(paste0(DataDirectory,"/ProcessedData_BLCA.Rdata"))
 CNV <- ProcessedData$CNV_TCGA_thresholded
 colnames(CNV) <- paste0(colnames(CNV),"-01")
+CNV <- t(CNV)
 
 # list of transcription factors
 TFs <- read.table(paste0(path,"Data/TCGA/AllHumanTranscriptionFactor.txt"))
