@@ -45,6 +45,11 @@ Subtypes <- as.character(Subtypes)
 names(Subtypes) <- samples
 Subtypes <- Subtypes[rownames(MA)]
 
+# CNV data 
+load(paste0(DataDirectory,"/ProcessedData_BLCA.Rdata"))
+CNV <- ProcessedData$CNV_TCGA_thresholded
+colnames(CNV) <- paste0(colnames(CNV),"-01")
+
 # list of transcription factors
 TFs <- read.table(paste0(path,"Data/TCGA/AllHumanTranscriptionFactor.txt"))
 TFs <- TFs$V1 
@@ -57,6 +62,6 @@ subtypes <- names(which(Subtypes==names(table(Subtypes))[1]))
 Results <- LIONS_Main_Code(MA_cancer = MA[subtypes,],
                            MA_normal = MA[!(rownames(MA)%in%subtypes),],
                            TFs = TFs,Method="hLICORN",
-                           CNV_matrix = CNV_matrix,CNV_correction = TRUE,
+                           CNV_matrix = CNV,CNV_correction = TRUE,
                            LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.5),
                            TargetDirectory = TargetDirectory, pathEM = pathEM)
