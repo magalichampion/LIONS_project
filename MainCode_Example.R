@@ -8,7 +8,7 @@ library(stringr)
 library(glmnet)
 
 # Define your path and target directory
-TargetDirectory <- "results/"
+TargetDirectory <- "results/" # before running the algorithm, a "results" folder must be created
 pathEM <- "algoEM/"
 DataDirectory <- "data_TCGA/"
 source("MainCode.R") 
