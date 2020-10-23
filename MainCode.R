@@ -1,19 +1,19 @@
-########### Main code for the identification ###################
-### of deregulated TFs involved in specific cancer subtypes ####
+############## Main code for the identification ###############
+### of deregulation mechanisms specific to cancer subtypes ####
 
 DeregGenes <- function(MA_cancer,MA_normal,TFs,
-                            CNV_matrix, CNV_correction = FALSE,
-                            VarMax=1,
-                            LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.5),
-                            TargetDirectory,pathEM){
+                      CNV_matrix, CNV_correction = FALSE,
+                      VarMax=1,
+                      LicornThresholds=list(minCoregSupport=0.5,searchThresh=0.5),
+                      TargetDirectory,pathEM){
 ##### List of inputs ####
 # Data:
 #   - MA_cancer: matrix of gene expression from tumor samples (genes in columns, samples in rows)
 #   - MA_normal: matrix of gene expression from normal tissues (genes in columns, samples in rows)
 #   - TFs: list of transcription factors
-#   - CNV_matrix: matrix containing CNV data (genes in coumns, samples in rows)
+#   - CNV_matrix: matrix of Copy Number Variation data (genes in coumns, samples in rows)
 #
-# CNV_correction: TRUE/FALSE depending on whether you want to correct gene expression data from copy number effects (if TRUE, the program needs CNV data)
+# CNV_correction: TRUE/FALSE depending on whether you want to correct gene expression data from copy number effects (if TRUE, CNV data are needed)
 #
 # Parameters:
 #   - VarMax: keep the top VarMax genes (by default = 1)
@@ -22,7 +22,7 @@ DeregGenes <- function(MA_cancer,MA_normal,TFs,
 #
 # Others:
 #   - Target directory: where to store the outputs and data
-#   - pathEM: where the EM algorithm is located
+#   - pathEM: where the EM algorithm is located (folder "algoEM")
 
 if (is.null(LicornThresholds$minCoregSupport)){
   minCoregSupport <- 0.5
@@ -66,7 +66,23 @@ if (length(TFs)==0){
 }
 MA_cancer <- MA_cancer[,Genes]
 MA_normal <- MA_normal[,Genes]
-cat("\n\t Summary:",length(Genes)," genes with expression data from ",nrow(MA_cancer)," tumor samples and ",nrow(MA_normal)," normal tissues.")
+
+if (CNV_correction==TRUE){
+  # keep genes and samples with both MA and CNV data
+  Genes <- intersect(colnames(CNV_matrix),Genes)
+  Samples_cancer <- intersect(rownames(CNV_matrix),rownames(MA_cancer))
+  Samples_normal <- intersect(rownames(CNV_matrix),rownames(MA_normal))
+  
+  cat(paste0("\n\t Summary: ",length(Genes)," genes, ",length(Samples_cancer)," tumor samples and ",length(Samples_normal)," normal samples with both gene expression and CNV data."))
+  MA_cancer <- MA_cancer[Samples_cancer,Genes]
+  MA_normal <- MA_normal[Samples_normal,Genes]
+  CNV_normal <- CNV_matrix[Samples_normal,Genes]
+  CNV_cancer <- CNV_matrix[Samples_cancer,Genes]
+  
+  TFs <- intersect(Genes,TFs)
+} else {
+  cat("\n\t Summary:",length(Genes)," genes with expression data from ",nrow(MA_cancer)," tumor samples and ",nrow(MA_normal)," normal tissues.")
+}
 
 # standardize data
 MA_normal = MA_normal - matrix(1,nrow(MA_normal),1) %*% colMeans(MA_normal)
@@ -168,7 +184,7 @@ rownames(Beta) <- colnames(Adj_matrix)
 colnames(Beta) <- colnames(Score)
 
 # save final results
-Results <- list(Beta=Beta,Score=Scores_log,Adj_matrix=Adj_matrix)
+Results <- list(Beta=Beta,Score=Score,Adj_matrix=Adj_matrix)
 return(Results)
 }
 
@@ -196,7 +212,7 @@ Transform_Network <- function(dummyNet){
 
 ## this function is useful to correct gene expression for CNV
 DataCorrection <- function(MA,CNV_matrix){
-  cat("Correcting gene expression using CNV.\n")
+  cat("\n\t Correcting gene expression using CNV.\n")
   CorrectedExpression <- foreach(j=1:ncol(CNV_matrix),.combine='cbind') %do% {
     Predictions <-resid(lm(MA[,j]~as.numeric(CNV_matrix[,j])))
   }
